@@ -123,7 +123,7 @@ object TunnelImporter {
         }
     }
 
-    private fun onTunnelImportFinished(tunnels: List<ObservableTunnel>, throwables: Collection<Throwable>, messageCallback: (CharSequence) -> Unit) {
+     fun onTunnelImportFinished(tunnels: List<ObservableTunnel>, throwables: Collection<Throwable>, messageCallback: (CharSequence) -> Unit) {
         val context = Application.get().applicationContext
         var message = ""
         for (throwable in throwables) {

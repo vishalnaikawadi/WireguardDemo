@@ -9,11 +9,7 @@ import android.content.Intent
 import android.content.res.Resources
 import android.os.Bundle
 import android.util.Log
-import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.Toast
@@ -25,22 +21,18 @@ import com.google.android.material.snackbar.Snackbar
 import com.hvn.wireguarddemo.Application
 import com.hvn.wireguarddemo.R
 import com.hvn.wireguarddemo.databinding.TunnelListFragmentBinding
-
 import com.hvn.wireguarddemo.databinding.TunnelListItemBinding
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import com.hvn.wireguarddemo.wireguard.activity.TunnelCreatorActivity
 import com.hvn.wireguarddemo.wireguard.databinding.ObservableKeyedRecyclerViewAdapter.RowConfigurationHandler
 import com.hvn.wireguarddemo.wireguard.model.ObservableTunnel
 import com.hvn.wireguarddemo.wireguard.util.ErrorMessages
 import com.hvn.wireguarddemo.wireguard.util.TunnelImporter
 import com.hvn.wireguarddemo.wireguard.widget.MultiselectableRelativeLayout
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.launch
-import java.util.ArrayList
-import java.util.HashSet
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import com.wireguard.config.Config
+import kotlinx.coroutines.*
+import java.util.*
 
 /**
  * Fragment containing a list of known WireGuard tunnels. It allows creating and deleting tunnels.
@@ -49,20 +41,26 @@ class TunnelListFragment : BaseFragment() {
     private val actionModeListener = ActionModeListener()
     private var actionMode: ActionMode? = null
     private var binding: TunnelListFragmentBinding? = null
-    private val tunnelFileImportResultLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { data ->
-        if (data == null) return@registerForActivityResult
-        val activity = activity ?: return@registerForActivityResult
-        val contentResolver = activity.contentResolver ?: return@registerForActivityResult
-        activity.lifecycleScope.launch {
-            TunnelImporter.importTunnel(contentResolver, data) { showSnackbar(it) }
+    private val tunnelFileImportResultLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { data ->
+            if (data == null) return@registerForActivityResult
+            val activity = activity ?: return@registerForActivityResult
+            val contentResolver = activity.contentResolver ?: return@registerForActivityResult
+            activity.lifecycleScope.launch {
+                TunnelImporter.importTunnel(contentResolver, data) { showSnackbar(it) }
+            }
         }
-    }
 
     private val qrImportResultLauncher = registerForActivityResult(ScanContract()) { result ->
         val qrCode = result.contents
         val activity = activity
         if (qrCode != null && activity != null) {
-            activity.lifecycleScope.launch { TunnelImporter.importTunnel(parentFragmentManager, qrCode) { showSnackbar(it) } }
+            activity.lifecycleScope.launch {
+                TunnelImporter.importTunnel(
+                    parentFragmentManager,
+                    qrCode
+                ) { showSnackbar(it) }
+            }
         }
     }
 
@@ -73,29 +71,77 @@ class TunnelListFragment : BaseFragment() {
             if (checkedItems != null) {
                 for (i in checkedItems) actionModeListener.setItemChecked(i, true)
             }
+
+        }
+
+        activity?.lifecycleScope?.launch {
+            addConfig {
+                Log.d("error====", it.toString())
+            }
         }
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
-                              savedInstanceState: Bundle?): View? {
+    private suspend fun addConfig(messageCallback: (CharSequence) -> Unit) =
+        withContext(Dispatchers.IO) {
+
+            val futureTunnels = ArrayList<Deferred<ObservableTunnel>>()
+            val throwables = ArrayList<Throwable>()
+            futureTunnels.add(CoroutineScope(Dispatchers.Main).async(SupervisorJob()) {
+                Application.getTunnelManager()
+                    .create("test1", Config.parse(requireActivity().assets!!.open("test.conf")))
+            })
+            if (futureTunnels.isEmpty()) {
+                //do something
+            }
+            val tunnels = futureTunnels.mapNotNull {
+                try {
+                    it.await()
+                } catch (e: Throwable) {
+                    throwables.add(e)
+                    null
+                }
+            }
+            withContext(Dispatchers.Main.immediate) {
+                TunnelImporter.onTunnelImportFinished(
+                    tunnels,
+                    throwables,
+                    messageCallback
+                )
+            }
+        }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
         super.onCreateView(inflater, container, savedInstanceState)
         binding = TunnelListFragmentBinding.inflate(inflater, container, false)
         val bottomSheet = AddTunnelsSheet()
         binding?.apply {
             createFab.setOnClickListener {
-                childFragmentManager.setFragmentResultListener(AddTunnelsSheet.REQUEST_KEY_NEW_TUNNEL, viewLifecycleOwner) { _, bundle ->
+                childFragmentManager.setFragmentResultListener(
+                    AddTunnelsSheet.REQUEST_KEY_NEW_TUNNEL,
+                    viewLifecycleOwner
+                ) { _, bundle ->
                     when (bundle.getString(AddTunnelsSheet.REQUEST_METHOD)) {
                         AddTunnelsSheet.REQUEST_CREATE -> {
-                            startActivity(Intent(requireActivity(), TunnelCreatorActivity::class.java))
+                            startActivity(
+                                Intent(
+                                    requireActivity(),
+                                    TunnelCreatorActivity::class.java
+                                )
+                            )
                         }
                         AddTunnelsSheet.REQUEST_IMPORT -> {
                             tunnelFileImportResultLauncher.launch("*/*")
                         }
                         AddTunnelsSheet.REQUEST_SCAN -> {
-                            qrImportResultLauncher.launch(ScanOptions()
+                            qrImportResultLauncher.launch(
+                                ScanOptions()
                                     .setOrientationLocked(false)
                                     .setBeepEnabled(false)
-                                    .setPrompt(getString(R.string.qr_code_hint)))
+                                    .setPrompt(getString(R.string.qr_code_hint))
+                            )
                         }
                     }
                 }
@@ -116,7 +162,10 @@ class TunnelListFragment : BaseFragment() {
         outState.putIntegerArrayList(CHECKED_ITEMS, actionModeListener.getCheckedItems())
     }
 
-    override fun onSelectedTunnelChanged(oldTunnel: ObservableTunnel?, newTunnel: ObservableTunnel?) {
+    override fun onSelectedTunnelChanged(
+        oldTunnel: ObservableTunnel?,
+        newTunnel: ObservableTunnel?
+    ) {
         binding ?: return
         lifecycleScope.launch {
             val tunnels = Application.getTunnelManager().getTunnels()
@@ -143,39 +192,51 @@ class TunnelListFragment : BaseFragment() {
         binding ?: return
         binding!!.fragment = this
         lifecycleScope.launch { binding!!.tunnels = Application.getTunnelManager().getTunnels() }
-        binding!!.rowConfigurationHandler = object : RowConfigurationHandler<TunnelListItemBinding, ObservableTunnel> {
-            override fun onConfigureRow(binding: TunnelListItemBinding, item: ObservableTunnel, position: Int) {
-                binding.fragment = this@TunnelListFragment
-                binding.root.setOnClickListener {
-                    if (actionMode == null) {
-                        selectedTunnel = item
-                    } else {
-                        actionModeListener.toggleItemChecked(position)
+        binding!!.rowConfigurationHandler =
+            object : RowConfigurationHandler<TunnelListItemBinding, ObservableTunnel> {
+                override fun onConfigureRow(
+                    binding: TunnelListItemBinding,
+                    item: ObservableTunnel,
+                    position: Int
+                ) {
+                    binding.fragment = this@TunnelListFragment
+                    binding.root.setOnClickListener {
+                        if (actionMode == null) {
+                            selectedTunnel = item
+                        } else {
+                            actionModeListener.toggleItemChecked(position)
+                        }
                     }
+                    binding.root.setOnLongClickListener {
+                        actionModeListener.toggleItemChecked(position)
+                        true
+                    }
+                    if (actionMode != null)
+                        (binding.root as MultiselectableRelativeLayout).setMultiSelected(
+                            actionModeListener.checkedItems.contains(position)
+                        )
+                    else
+                        (binding.root as MultiselectableRelativeLayout).setSingleSelected(
+                            selectedTunnel == item
+                        )
                 }
-                binding.root.setOnLongClickListener {
-                    actionModeListener.toggleItemChecked(position)
-                    true
-                }
-                if (actionMode != null)
-                    (binding.root as MultiselectableRelativeLayout).setMultiSelected(actionModeListener.checkedItems.contains(position))
-                else
-                    (binding.root as MultiselectableRelativeLayout).setSingleSelected(selectedTunnel == item)
             }
-        }
     }
 
     private fun showSnackbar(message: CharSequence) {
         val binding = binding
         if (binding != null)
             Snackbar.make(binding.mainContainer, message, Snackbar.LENGTH_LONG)
-                    .setAnchorView(binding.createFab)
-                    .show()
+                .setAnchorView(binding.createFab)
+                .show()
         else
             Toast.makeText(activity ?: Application.get(), message, Toast.LENGTH_SHORT).show()
     }
 
-    private fun viewForTunnel(tunnel: ObservableTunnel, tunnels: List<*>): MultiselectableRelativeLayout? {
+    private fun viewForTunnel(
+        tunnel: ObservableTunnel,
+        tunnels: List<*>
+    ): MultiselectableRelativeLayout? {
         return binding?.tunnelList?.findViewHolderForAdapterPosition(tunnels.indexOf(tunnel))?.itemView as? MultiselectableRelativeLayout
     }
 
@@ -202,7 +263,8 @@ class TunnelListFragment : BaseFragment() {
                             val tunnels = Application.getTunnelManager().getTunnels()
                             val tunnelsToDelete = ArrayList<ObservableTunnel>()
                             for (position in copyCheckedItems) tunnelsToDelete.add(tunnels[position])
-                            val futures = tunnelsToDelete.map { async(SupervisorJob()) { it.deleteAsync() } }
+                            val futures =
+                                tunnelsToDelete.map { async(SupervisorJob()) { it.deleteAsync() } }
                             onTunnelDeletionFinished(futures.awaitAll().size, null)
                         } catch (e: Throwable) {
                             onTunnelDeletionFinished(0, e)
@@ -284,7 +346,7 @@ class TunnelListFragment : BaseFragment() {
         private fun animateFab(view: View?, show: Boolean) {
             view ?: return
             val animation = AnimationUtils.loadAnimation(
-                    context, if (show) R.anim.scale_up else R.anim.scale_down
+                context, if (show) R.anim.scale_up else R.anim.scale_down
             )
             animation.setAnimationListener(object : Animation.AnimationListener {
                 override fun onAnimationRepeat(animation: Animation?) {
