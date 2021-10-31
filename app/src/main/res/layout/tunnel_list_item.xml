@@ -46,17 +46,15 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@{key}"
-            tools:text="@sample/interface_names.json/names/names/name" />
+            android:visibility="gone"
+             />
 
         <com.hvn.wireguarddemo.wireguard.widget.ToggleSwitch
             android:id="@+id/tunnel_switch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignBaseline="@+id/tunnel_name"
-            android:layout_alignParentEnd="true"
-            android:nextFocusLeft="@+id/tunnel_list_item"
+            android:layout_centerInParent="true"
             app:checked="@{item.state == State.UP}"
-            app:onBeforeCheckedChanged="@{fragment::setTunnelState}"
-            tools:checked="@sample/interface_names.json/names/checked/checked" />
+            app:onBeforeCheckedChanged="@{fragment::setTunnelState}" />
     </com.hvn.wireguarddemo.wireguard.widget.MultiselectableRelativeLayout>
 </layout>
