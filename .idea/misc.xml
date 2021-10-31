@@ -3,7 +3,19 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="app/src/main/res/drawable/ic_action_add_white.xml" value="0.2125" />
+        <entry key="app/src/main/res/drawable/list_item_background.xml" value="0.37135416666666665" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.35520833333333335" />
+        <entry key="app/src/main/res/layout/app_list_dialog_fragment.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tunnel_detail_fragment.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tunnel_editor_fragment.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tunnel_editor_peer.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tunnel_list_fragment.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tv_activity.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/layout/tv_file_list_item.xml" value="0.19739583333333333" />
+        <entry key="app/src/main/res/xml/app_restrictions.xml" value="0.35520833333333335" />
+        <entry key="app/src/main/res/xml/xml.xml" value="0.35520833333333335" />
+        <entry key="ui/src/main/res/layout/tunnel_list_fragment.xml" value="0.1" />
       </map>
     </option>
   </component>

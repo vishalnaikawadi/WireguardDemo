@@ -13,6 +13,11 @@ buildscript {
     }
 }
 
+plugins {
+    id "de.undercouch.download" version "4.1.2"
+}
+
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
@@ -21,8 +26,61 @@ ext {
     wireguardVersionCode = 490
     wireguardVersionName = '1.0.20210926'
     groupName = 'com.wireguard.android'
-    annotationsVersion = '1.2.0'
     collectionVersion = '1.1.0'
     jsr305Version = '3.0.2'
     junitVersion = '4.13.2'
+    wireguardTunnelVersion ='1.0.20210926'
+    activityVersion = '1.4.0'
+    annotationsVersion = '1.2.0'
+    appcompatVersion = '1.3.1'
+    biometricVersion = '1.1.0'
+    constraintLayoutVersion = '2.1.1'
+    coordinatorLayoutVersion = '1.1.0'
+    coreKtxVersion = '1.7.0'
+    coroutinesVersion = '1.5.2'
+    datastoreVersion = '1.0.0'
+    desugarVersion = '1.1.5'
+    fragmentVersion = '1.3.6'
+    lifecycleRuntimeKtxVersion = '2.4.0'
+    materialComponentsVersion = '1.4.0'
+    preferenceVersion = '1.1.1'
+    zxingEmbeddedVersion = '4.3.0'
 }
+
+task downloadCrowdin(type: Download) {
+    src 'https://crowdin.com/backend/download/project/wireguard.zip'
+    dest file('build/translations.zip')
+    overwrite true
+}
+
+task cleanCrowdin(type: Delete) {
+    delete 'ui/src/main/res/values-*/strings.xml'
+}
+
+task extractCrowdin(type: Copy, dependsOn: ['downloadCrowdin', 'cleanCrowdin']) {
+    mustRunAfter 'downloadCrowdin'
+    from zipTree(file('build/translations.zip'))
+    into file('build/translations')
+    doFirst {
+        delete 'build/translations'
+    }
+}
+
+task crowdin(type: Copy, dependsOn: ['extractCrowdin']) {
+    mustRunAfter 'extractCrowdin'
+    from 'build/translations/wireguard-android/ui/src/main/res'
+    into 'ui/src/main/res/'
+    doLast {
+        delete 'build/translations'
+        delete 'build/translations.zip'
+    }
+}
+
+tasks {
+    wrapper {
+        gradleVersion = "7.2"
+        distributionSha256Sum = "f581709a9c35e9cb92e16f585d2c4bc99b2b1a5f85d2badbd3dc6bff59e1e6dd"
+    }
+}
+
+apply from: "version.gradle"
